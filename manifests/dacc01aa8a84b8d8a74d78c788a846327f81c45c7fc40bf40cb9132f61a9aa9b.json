@@ -1,0 +1,19 @@
+{
+  "file_id": "dacc01aa8a84b8d8a74d78c788a846327f81c45c7fc40bf40cb9132f61a9aa9b",
+  "filename": "e2e_sample.bin",
+  "size": 1048576,
+  "chunk_size": 524288,
+  "nb_chunks": 2,
+  "chunks": [
+    {
+      "index": 0,
+      "hash": "a75b8c891c8145464b43b21654289e121cbb503b98058f96a232d622bf193054",
+      "size": 524288
+    },
+    {
+      "index": 1,
+      "hash": "470e288a31811703a115ef3cdbfe22285b2cc698611143de191e8383598bfc6a",
+      "size": 524288
+    }
+  ]
+}

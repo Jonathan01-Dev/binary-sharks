@@ -1,0 +1,14 @@
+{
+  "file_id": "98676bac14107e56373e8da3edaffcc2098643f396a9f6946c5a3d481091b969",
+  "filename": "cmd_sample.bin",
+  "size": 350000,
+  "chunk_size": 524288,
+  "nb_chunks": 1,
+  "chunks": [
+    {
+      "index": 0,
+      "hash": "98676bac14107e56373e8da3edaffcc2098643f396a9f6946c5a3d481091b969",
+      "size": 350000
+    }
+  ]
+}
