@@ -3,6 +3,7 @@
 <section class="card">
   <h2>Envoyer un message</h2>
   <p>Utilise la cle publique et le port d'un pair pour chatter.</p>
+  <div class="status">Ecoute active automatique sur le port local: {{ local_port }}</div>
   <form method="post">
     <div class="form-row">
       <label for="peer_id">Peer ID</label>
@@ -14,7 +15,7 @@
     </div>
     <div class="form-row">
       <label for="port_local">Port local</label>
-      <input id="port_local" name="port_local" type="number" value="7904" required>
+      <input id="port_local" name="port_local" type="number" value="{{ local_port }}" required>
     </div>
     <div class="form-row">
       <label for="peer_port">Port du pair</label>

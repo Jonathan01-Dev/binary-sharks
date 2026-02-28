@@ -170,10 +170,11 @@ def download():
 
 @app.route('/chat', methods=['GET', 'POST'])
 def chat():
+    default_port = 7904
     if request.method == 'POST':
         peer = request.form.get('peer_id', '').strip()
         message = request.form.get('message', '').strip()
-        port_local = int(request.form.get('port_local', '7904'))
+        port_local = int(request.form.get('port_local', str(default_port)))
         peer_port = request.form.get('peer_port', '').strip()
         peer_ip = request.form.get('peer_ip', '').strip()
 
@@ -211,7 +212,10 @@ def chat():
             details = lines[-1] if lines else 'Erreur inconnue'
             flash_status(False, f'Envoi echoue: {details}')
         return redirect(url_for('chat'))
-    return render_template('chat.html')
+    if not ensure_node_running(default_port):
+        start_node_process(default_port)
+        flash_status(True, f'Listener chat auto lance sur {default_port}.')
+    return render_template('chat.html', local_port=default_port)
 
 
 @app.route('/chat/messages', methods=['GET'])
