@@ -12,8 +12,6 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from src.messaging.gemini import ask_gemini
-
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = 'archipel-web-secret'
 
@@ -28,9 +26,6 @@ MAX_PORT_EVENTS = 500
 
 CHAT_RECV_RE = re.compile(r'^\[(?:UDP-)?CHAT\]\s+recv\s+(.+?)\s+\|\s+(.+?)\s+says:\s+(.*)$')
 MANIFEST_RE = re.compile(r'^\[SEND\]\s+manifest:\s+(.+)$', re.IGNORECASE)
-AI_TRIGGER_TAG = '@archipel-ai'
-AI_TRIGGER_CMD = '/ask'
-AI_CONTEXT_SIZE = 12
 
 
 def make_path(value: str) -> Path:
@@ -142,41 +137,6 @@ def extract_manifest_path(output: str) -> str | None:
         if m:
             return m.group(1).strip()
     return None
-
-
-def _is_ai_triggered(text: str) -> bool:
-    value = (text or '').strip().lower()
-    return value.startswith(AI_TRIGGER_CMD) or AI_TRIGGER_TAG in value
-
-
-def _extract_ai_query(text: str) -> str:
-    value = (text or '').strip()
-    lower = value.lower()
-    if lower.startswith(AI_TRIGGER_CMD):
-        return value[len(AI_TRIGGER_CMD) :].strip()
-    idx = lower.find(AI_TRIGGER_TAG)
-    if idx >= 0:
-        before = value[:idx].strip()
-        after = value[idx + len(AI_TRIGGER_TAG) :].strip()
-        return f'{before} {after}'.strip()
-    return value
-
-
-def _build_ai_context(limit: int = AI_CONTEXT_SIZE) -> str:
-    with MESSAGE_LOCK:
-        recent = CHAT_MESSAGES[-limit:]
-    labels = {
-        'out': 'Moi',
-        'in': 'Pair',
-        'ai_user': 'Moi->IA',
-        'ai': 'Archipel-AI',
-        'system': 'Systeme',
-    }
-    lines = []
-    for item in recent:
-        role = labels.get(item.get('direction', ''), 'Message')
-        lines.append(f"{role}: {item.get('text', '')}")
-    return '\n'.join(lines)
 
 
 @app.route('/')
@@ -325,38 +285,19 @@ def chat():
         peer_port = request.form.get('peer_port', '').strip()
         peer_ip = request.form.get('peer_ip', '').strip()
 
-        if _is_ai_triggered(message):
-            query = _extract_ai_query(message)
-            if not query:
-                add_chat_message('system', "Archipel-AI: prompt vide. Utilise '/ask ta question'.")
-                add_port_event('warn', 'chat', 'AI called with empty prompt.', port=port_local)
-                flash_status(False, "Prompt vide pour l'assistant IA.")
-                return redirect(url_for('chat'))
-
-            context = _build_ai_context()
-            add_chat_message('ai_user', query)
-            add_port_event('info', 'chat', 'AI assistant prompt submitted.', port=port_local)
-            full_prompt = (
-                "Tu es Archipel-AI, assistant du projet P2P.\n"
-                "Reponds en francais, de facon concise et actionnable.\n\n"
-                f"Contexte recent du chat ({AI_CONTEXT_SIZE} messages max):\n{context}\n\n"
-                f"Question utilisateur:\n{query}"
-            )
-            try:
-                ai_reply = ask_gemini(full_prompt)
-            except Exception as exc:
-                add_chat_message('system', f'Archipel-AI indisponible: {exc}')
-                add_port_event('error', 'chat', f'AI unavailable: {exc}', port=port_local)
-                flash_status(False, 'Assistant IA indisponible (mode offline ou quota).')
-                return redirect(url_for('chat'))
-            add_chat_message('ai', ai_reply)
-            add_port_event('info', 'chat', 'AI response generated.', port=port_local)
-            flash_status(True, 'Reponse Archipel-AI generee.')
-            return redirect(url_for('chat'))
-
         if not peer or not message:
             add_port_event('warn', 'chat', 'Message rejected: missing peer_id or message.', port=port_local)
             flash_status(False, 'Renseigne un peer ID et un message valides.')
+            return redirect(url_for('chat'))
+
+        if not peer_port:
+            add_port_event('warn', 'chat', 'Message rejected: missing peer_port.', port=port_local)
+            flash_status(False, 'Port du pair requis (ex: 7902).')
+            return redirect(url_for('chat'))
+
+        if not peer_ip:
+            add_port_event('warn', 'chat', 'Message rejected: missing peer_ip in multi-PC mode.', port=port_local)
+            flash_status(False, 'IP du pair requise entre 2 PC (ex: 192.168.x.x).')
             return redirect(url_for('chat'))
 
         if not ensure_node_running(port_local):
@@ -392,8 +333,12 @@ def chat():
         else:
             lines = (result.stderr or result.stdout or '').strip().splitlines()
             details = lines[-1] if lines else 'Erreur inconnue'
+            hint = ''
+            lower_details = details.lower()
+            if 'winerror 121' in lower_details or 'semaphore' in lower_details or 'connexion timeout' in lower_details:
+                hint = ' Astuce: entre 2 PC utilise peer_ip=IPv4 LAN du pair (ex: 192.168.x.x) et peer_port correct.'
             add_port_event('error', 'chat', f'Message send failed: {details}', port=port_local)
-            flash_status(False, f'Envoi echoue: {details}')
+            flash_status(False, f'Envoi echoue: {details}{hint}')
         return redirect(url_for('chat'))
     if not ensure_node_running(default_port):
         start_node_process(default_port)
@@ -412,3 +357,4 @@ def chat_messages():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=False)
+

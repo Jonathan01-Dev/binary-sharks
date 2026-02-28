@@ -216,9 +216,20 @@ async def cmd_msg(
     peer_ip: str | None,
 ):
     peers = PeerTable()
+    chat = ChatService(peers)
+
+    # Direct mode for multi-PC usage: explicit IP + port, no multicast dependency.
+    if peer_ip:
+        if peer_port is None:
+            raise ValueError('peer_port requis quand peer_ip est fourni.')
+        peers.upsert(peer_id, peer_ip, peer_port)
+        print(f'[MSG] Direct route: {peer_ip}:{peer_port}')
+        await chat.send(peer_id, text, peer_port=peer_port)
+        print('[MSG] Sent')
+        return
+
     discovery = DiscoveryService(port, peers)
     tcp = TCPServer(port)
-    chat = ChatService(peers)
 
     async def on_key_exchange(msg: dict, addr):
         sender_id = msg.get('from')
@@ -251,15 +262,12 @@ async def cmd_msg(
 
     try:
         await asyncio.sleep(wait_seconds)
-        if peer_ip and peer_port is not None:
-            peers.upsert(peer_id, peer_ip, peer_port)
-            print(f'[MSG] Route injected: {peer_ip}:{peer_port}')
-        elif peer_port is not None:
+        if peer_port is not None:
             targeted = any(p.node_id == peer_id and p.tcp_port == peer_port for p in peers.alive())
             if not targeted:
                 print(
                     '[MSG] Peer not discovered yet for this id/port. '
-                    'Retry with higher --wait-seconds or pass --peer-ip.'
+                    'Use --peer-ip with LAN IPv4 for multi-PC chat.'
                 )
         await chat.send(peer_id, text, peer_port=peer_port)
         print('[MSG] Sent')
@@ -267,7 +275,6 @@ async def cmd_msg(
         discovery_task.cancel()
         tcp_task.cancel()
         await asyncio.gather(discovery_task, tcp_task, return_exceptions=True)
-
 
 def parse_args():
     load_dotenv()
@@ -365,6 +372,8 @@ def main():
 
 if __name__ == '__main__':
     main()
+
+
 
 
 
