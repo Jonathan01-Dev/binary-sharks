@@ -2,12 +2,14 @@ import argparse
 import asyncio
 import json
 import os
+import socket
 from pathlib import Path
 
 import nacl.public
 from dotenv import load_dotenv
 
 from src.crypto.cipher import derive_session_key, generate_x25519_keypair
+from src.crypto.keys import load_keypair, node_id as get_node_id
 from src.messaging.chat import ChatService
 from src.network.discovery import DiscoveryService
 from src.network.peer_table import PeerTable
@@ -103,8 +105,46 @@ async def run_start(port: int, shared_files: list[str]):
     for filepath in shared_files:
         register_shared_file(filepath)
 
+    async def udp_chat_server():
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind(('0.0.0.0', port))
+        sock.setblocking(False)
+        loop = asyncio.get_event_loop()
+        print(f'[UDP] Chat listener on port {port}')
+        while True:
+            data, addr = await loop.sock_recvfrom(sock, 1024 * 1024)
+            try:
+                msg = json.loads(data.decode())
+                mtype = msg.get('type')
+
+                if mtype == 'CHUNK_REQ_UDP':
+                    file_id = msg.get('file_id')
+                    chunk_idx = msg.get('chunk_idx')
+
+                    if file_id not in shared_chunks:
+                        resp = {'type': 'CHUNK_RESP_UDP', 'status': 'NOT_FOUND_FILE'}
+                    elif chunk_idx not in shared_chunks[file_id]:
+                        resp = {'type': 'CHUNK_RESP_UDP', 'status': 'NOT_FOUND_CHUNK'}
+                    else:
+                        chunk_bytes = shared_chunks[file_id][chunk_idx]
+                        # UDP datagram size is limited; keep payload under practical MTU limits.
+                        if len(chunk_bytes) > 60000:
+                            resp = {'type': 'CHUNK_RESP_UDP', 'status': 'TOO_LARGE_UDP'}
+                        else:
+                            data_hex = chunk_bytes.hex()
+                            resp = {'type': 'CHUNK_RESP_UDP', 'status': 'OK', 'data': data_hex}
+
+                    await loop.sock_sendto(sock, json.dumps(resp).encode(), addr)
+                    continue
+
+                sender = msg.get('from', 'unknown')
+                text = msg.get('text', '')
+                print(f'[UDP-CHAT] recv {addr[0]}:{addr[1]} -> local:{port} | {sender[:12]}... says: {text}')
+            except Exception as e:
+                print(f'[UDP] Receive error: {e}')
+
     print(f'[ARCHIPEL] Node start on port {port}')
-    await asyncio.gather(discovery.start(), tcp.start(), peer_monitor(peers))
+    await asyncio.gather(discovery.start(), tcp.start(), udp_chat_server(), peer_monitor(peers))
 
 
 def cmd_send(filepath: str):
@@ -117,7 +157,7 @@ def cmd_send(filepath: str):
     print('[SEND] Run start command on sender node with --share to serve chunks.')
 
 
-async def cmd_download(port: int, manifest_path: str, wait_seconds: int, output_dir: str):
+async def cmd_download(port: int, manifest_path: str, wait_seconds: int, output_dir: str, transport: str):
     manifest = load_manifest(manifest_path)
 
     peers = PeerTable()
@@ -140,15 +180,41 @@ async def cmd_download(port: int, manifest_path: str, wait_seconds: int, output_
         for p in alive:
             print(f'  - {p.node_id[:12]}... @ {p.ip}:{p.tcp_port}')
 
+        if not alive:
+            # Local single-PC fallback for demo mode.
+            peers.upsert('local-sender', '127.0.0.1', 7901)
+            print('[DL] Fallback route injected: 127.0.0.1:7901')
+
         downloader = Downloader(peers, session_keys={})
-        await downloader.download(manifest, output_dir=output_dir)
+        await downloader.download(manifest, output_dir=output_dir, transport=transport)
     finally:
         discovery_task.cancel()
         tcp_task.cancel()
         await asyncio.gather(discovery_task, tcp_task, return_exceptions=True)
 
 
-async def cmd_msg(port: int, peer_id: str, text: str, wait_seconds: int, peer_port: int | None):
+async def cmd_msg_udp(port: int, peer_ip: str, peer_port: int, text: str):
+    _sk, vk = load_keypair()
+    my_id = get_node_id(vk)
+
+    payload = json.dumps({'type': 'MSG_UDP', 'from': my_id, 'text': text}).encode()
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    try:
+        sock.sendto(payload, (peer_ip, peer_port))
+    finally:
+        sock.close()
+
+    print(f'[UDP] Sent to {peer_ip}:{peer_port}')
+
+
+async def cmd_msg(
+    port: int,
+    peer_id: str,
+    text: str,
+    wait_seconds: int,
+    peer_port: int | None,
+    peer_ip: str | None,
+):
     peers = PeerTable()
     discovery = DiscoveryService(port, peers)
     tcp = TCPServer(port)
@@ -185,12 +251,16 @@ async def cmd_msg(port: int, peer_id: str, text: str, wait_seconds: int, peer_po
 
     try:
         await asyncio.sleep(wait_seconds)
-        if peer_port is not None:
+        if peer_ip and peer_port is not None:
+            peers.upsert(peer_id, peer_ip, peer_port)
+            print(f'[MSG] Route injected: {peer_ip}:{peer_port}')
+        elif peer_port is not None:
             targeted = any(p.node_id == peer_id and p.tcp_port == peer_port for p in peers.alive())
             if not targeted:
-                # Local fallback for demos when multicast discovery is delayed.
-                peers.upsert(peer_id, '127.0.0.1', peer_port)
-                print(f'[MSG] Fallback route injected: 127.0.0.1:{peer_port}')
+                print(
+                    '[MSG] Peer not discovered yet for this id/port. '
+                    'Retry with higher --wait-seconds or pass --peer-ip.'
+                )
         await chat.send(peer_id, text, peer_port=peer_port)
         print('[MSG] Sent')
     finally:
@@ -217,6 +287,7 @@ def parse_args():
     p_dl.add_argument('--port', type=int, default=int(os.getenv('NODE_PORT', '7777')))
     p_dl.add_argument('--wait-seconds', type=int, default=20, help='Discovery wait before download')
     p_dl.add_argument('--output-dir', default='./downloads')
+    p_dl.add_argument('--transport', choices=['tcp', 'udp'], default='tcp', help='Chunk transfer transport')
 
     p_msg = sub.add_parser('msg', help='Send encrypted message to a peer id')
     p_msg.add_argument('peer_id', help='Target node id (hex)')
@@ -224,6 +295,13 @@ def parse_args():
     p_msg.add_argument('--port', type=int, default=int(os.getenv('NODE_PORT', '7777')))
     p_msg.add_argument('--wait-seconds', type=int, default=12, help='Discovery wait before send')
     p_msg.add_argument('--peer-port', type=int, default=None, help='Target peer TCP port (recommended when node_id duplicates exist)')
+    p_msg.add_argument('--peer-ip', type=str, default=None, help='Target peer IP (manual route when multicast discovery fails)')
+
+    p_msg_udp = sub.add_parser('msg-udp', help='Send UDP message (no encryption)')
+    p_msg_udp.add_argument('peer_ip', help='Target peer IPv4')
+    p_msg_udp.add_argument('text', help='Message text')
+    p_msg_udp.add_argument('--peer-port', type=int, required=True, help='Target peer UDP port')
+    p_msg_udp.add_argument('--port', type=int, default=int(os.getenv('NODE_PORT', '7777')))
 
     parser.add_argument('--port', type=int, default=None, help=argparse.SUPPRESS)
 
@@ -249,6 +327,7 @@ def main():
                 manifest_path=str(Path(args.manifest).resolve()),
                 wait_seconds=args.wait_seconds,
                 output_dir=args.output_dir,
+                transport=args.transport,
             )
         )
         return
@@ -261,6 +340,18 @@ def main():
                 text=args.text,
                 wait_seconds=args.wait_seconds,
                 peer_port=args.peer_port,
+                peer_ip=args.peer_ip,
+            )
+        )
+        return
+
+    if args.command == 'msg-udp':
+        asyncio.run(
+            cmd_msg_udp(
+                port=args.port,
+                peer_ip=args.peer_ip,
+                peer_port=args.peer_port,
+                text=args.text,
             )
         )
         return
@@ -269,11 +360,19 @@ def main():
         asyncio.run(run_start(args.port, []))
         return
 
-    print('Use one of: start | send | download | msg')
+    print('Use one of: start | send | download | msg | msg-udp')
 
 
 if __name__ == '__main__':
     main()
+
+
+
+
+
+
+
+
 
 
 
