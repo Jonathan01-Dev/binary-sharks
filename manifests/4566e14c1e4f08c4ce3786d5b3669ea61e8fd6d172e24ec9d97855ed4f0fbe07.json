@@ -1,0 +1,14 @@
+{
+  "file_id": "4566e14c1e4f08c4ce3786d5b3669ea61e8fd6d172e24ec9d97855ed4f0fbe07",
+  "filename": "file2.bin",
+  "size": 350002,
+  "chunk_size": 524288,
+  "nb_chunks": 1,
+  "chunks": [
+    {
+      "index": 0,
+      "hash": "4566e14c1e4f08c4ce3786d5b3669ea61e8fd6d172e24ec9d97855ed4f0fbe07",
+      "size": 350002
+    }
+  ]
+}
