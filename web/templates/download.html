@@ -1,0 +1,26 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+<section class="card">
+  <h2>Recuperer un manifeste</h2>
+  <p>Fournis le manifeste genere par le sender et declenche un download fiable.</p>
+  <form method="post">
+    <div class="form-row">
+      <label for="manifest">Manifeste</label>
+      <input id="manifest" name="manifest" type="text" placeholder="manifests/abc123.json" required>
+    </div>
+    <div class="form-row">
+      <label for="port_source">Port source</label>
+      <input id="port_source" type="number" value="7902">
+    </div>
+    <div class="form-row">
+      <label for="transport">Transport</label>
+      <select id="transport">
+        <option>tcp</option>
+        <option>udp</option>
+      </select>
+    </div>
+    <button class="btn-gold" type="submit">Telecharger</button>
+  </form>
+  <div class="status">Dernier transfert: aucun</div>
+</section>
+{% endblock %}

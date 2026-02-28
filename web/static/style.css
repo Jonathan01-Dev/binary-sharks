@@ -1,0 +1,228 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0b1220;
+  --bg-soft: #111b31;
+  --card: rgba(9, 15, 28, 0.82);
+  --text: #f4f8ff;
+  --muted: #9eb2cf;
+  --accent: #f3b63c;
+  --accent-2: #e58833;
+  --ok: #2ec27e;
+  --error: #f66151;
+  --border: rgba(158, 178, 207, 0.25);
+  --shadow: 0 18px 40px rgba(2, 6, 14, 0.48);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  font-family: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  color: var(--text);
+  background:
+    radial-gradient(1000px 500px at 10% -10%, rgba(243, 182, 60, 0.2), transparent),
+    radial-gradient(900px 450px at 95% 0%, rgba(58, 124, 190, 0.22), transparent),
+    linear-gradient(180deg, var(--bg-soft), var(--bg));
+}
+
+.page-glow {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(140deg, rgba(243, 182, 60, 0.08), transparent 28%, rgba(46, 111, 186, 0.08));
+}
+
+.navbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 2rem;
+  backdrop-filter: blur(10px);
+  background: rgba(7, 11, 20, 0.58);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.navbar-brand {
+  color: var(--text);
+  text-decoration: none;
+  font-family: 'Space Grotesk', sans-serif;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.navbar-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.nav-link {
+  color: var(--muted);
+  text-decoration: none;
+  padding: 0.45rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  transition: 160ms ease;
+}
+
+.nav-link:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.container {
+  width: min(960px, 94vw);
+  margin: 2rem auto;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  padding: clamp(1rem, 2.5vw, 2rem);
+  box-shadow: var(--shadow);
+}
+
+.card h2 {
+  margin: 0;
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: clamp(1.4rem, 2.4vw, 2rem);
+  letter-spacing: 0.02em;
+}
+
+.card p {
+  color: var(--muted);
+  margin: 0.8rem 0 1.3rem;
+  max-width: 62ch;
+}
+
+.form-row {
+  margin-bottom: 1rem;
+}
+
+label {
+  display: block;
+  margin-bottom: 0.38rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+input,
+select,
+textarea {
+  width: 100%;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 0.75rem 0.95rem;
+  font: inherit;
+}
+
+textarea {
+  min-height: 120px;
+  resize: vertical;
+}
+
+input:focus,
+select:focus,
+textarea:focus {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(243, 182, 60, 0.18);
+}
+
+.btn-gold {
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  color: #1f1402;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.btn-gold:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.status {
+  margin-top: 1rem;
+  padding: 0.72rem 0.88rem;
+  border-radius: 12px;
+  border: 1px dashed rgba(255, 255, 255, 0.17);
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.alert-wrapper {
+  margin-bottom: 1rem;
+  display: grid;
+  gap: 0.6rem;
+}
+
+.alert {
+  padding: 0.72rem 0.9rem;
+  border-radius: 12px;
+  border: 1px solid transparent;
+}
+
+.alert-success {
+  color: #e7ffee;
+  background: rgba(46, 194, 126, 0.2);
+  border-color: rgba(46, 194, 126, 0.45);
+}
+
+.alert-error {
+  color: #fff0ee;
+  background: rgba(246, 97, 81, 0.2);
+  border-color: rgba(246, 97, 81, 0.45);
+}
+
+.card-footer {
+  margin-top: 1.2rem;
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  color: var(--muted);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  padding-top: 0.9rem;
+  font-size: 0.95rem;
+}
+
+footer {
+  text-align: center;
+  color: var(--muted);
+  padding: 1.4rem 0 2.1rem;
+  font-size: 0.86rem;
+}
+
+@media (max-width: 640px) {
+  .navbar {
+    padding: 0.85rem 1rem;
+  }
+
+  .navbar-nav {
+    gap: 0.25rem;
+  }
+
+  .card-footer {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
