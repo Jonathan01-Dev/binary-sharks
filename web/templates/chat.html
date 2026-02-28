@@ -2,12 +2,12 @@
 {% block content %}
 <section class="card">
   <h2>Envoyer un message</h2>
-  <p>Utilise la cle publique et le port d'un pair pour chatter.</p>
+  <p>Utilise la cle publique et le port d'un pair pour chatter. Pour l'IA: tape <code>/ask ...</code> ou <code>@archipel-ai ...</code>.</p>
   <div class="status">Ecoute active automatique sur le port local: {{ local_port }}</div>
   <form method="post">
     <div class="form-row">
       <label for="peer_id">Peer ID</label>
-      <input id="peer_id" name="peer_id" type="text" placeholder="hex..." required>
+      <input id="peer_id" name="peer_id" type="text" placeholder="hex... (optionnel pour /ask)">
     </div>
     <div class="form-row">
       <label for="message">Message</label>
@@ -36,10 +36,15 @@
     let lastTs = 0;
 
     function appendMessage(msg) {
-      const who = msg.direction === 'in' ? 'Recu' : 'Envoye';
+      let who = 'Envoye';
+      if (msg.direction === 'in') who = 'Recu';
+      if (msg.direction === 'ai_user') who = 'Toi -> IA';
+      if (msg.direction === 'ai') who = 'IA';
+      if (msg.direction === 'system') who = 'Systeme';
       const peer = msg.peer ? ` (${msg.peer})` : '';
       const line = document.createElement('div');
       line.textContent = `[${who}]${peer}: ${msg.text}`;
+      line.style.whiteSpace = 'pre-wrap';
       feed.appendChild(line);
       feed.scrollTop = feed.scrollHeight;
     }

@@ -6,11 +6,18 @@ import time
 from pathlib import Path
 
 from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
+from dotenv import load_dotenv
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+if str(PROJECT_ROOT) not in sys.path:
+    sys.path.insert(0, str(PROJECT_ROOT))
+
+from src.messaging.gemini import ask_gemini
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = 'archipel-web-secret'
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
+load_dotenv(PROJECT_ROOT / '.env')
 RUNNING_NODES: dict[int, subprocess.Popen] = {}
 MESSAGE_LOCK = threading.Lock()
 CHAT_MESSAGES: list[dict] = []
@@ -18,6 +25,9 @@ MAX_CHAT_MESSAGES = 200
 
 CHAT_RECV_RE = re.compile(r'^\[(?:UDP-)?CHAT\]\s+recv\s+(.+?)\s+\|\s+(.+?)\s+says:\s+(.*)$')
 MANIFEST_RE = re.compile(r'^\[SEND\]\s+manifest:\s+(.+)$', re.IGNORECASE)
+AI_TRIGGER_TAG = '@archipel-ai'
+AI_TRIGGER_CMD = '/ask'
+AI_CONTEXT_SIZE = 12
 
 
 def make_path(value: str) -> Path:
@@ -99,6 +109,41 @@ def extract_manifest_path(output: str) -> str | None:
         if m:
             return m.group(1).strip()
     return None
+
+
+def _is_ai_triggered(text: str) -> bool:
+    value = (text or '').strip().lower()
+    return value.startswith(AI_TRIGGER_CMD) or AI_TRIGGER_TAG in value
+
+
+def _extract_ai_query(text: str) -> str:
+    value = (text or '').strip()
+    lower = value.lower()
+    if lower.startswith(AI_TRIGGER_CMD):
+        return value[len(AI_TRIGGER_CMD) :].strip()
+    idx = lower.find(AI_TRIGGER_TAG)
+    if idx >= 0:
+        before = value[:idx].strip()
+        after = value[idx + len(AI_TRIGGER_TAG) :].strip()
+        return f'{before} {after}'.strip()
+    return value
+
+
+def _build_ai_context(limit: int = AI_CONTEXT_SIZE) -> str:
+    with MESSAGE_LOCK:
+        recent = CHAT_MESSAGES[-limit:]
+    labels = {
+        'out': 'Moi',
+        'in': 'Pair',
+        'ai_user': 'Moi->IA',
+        'ai': 'Archipel-AI',
+        'system': 'Systeme',
+    }
+    lines = []
+    for item in recent:
+        role = labels.get(item.get('direction', ''), 'Message')
+        lines.append(f"{role}: {item.get('text', '')}")
+    return '\n'.join(lines)
 
 
 @app.route('/')
@@ -219,6 +264,31 @@ def chat():
         port_local = int(request.form.get('port_local', str(default_port)))
         peer_port = request.form.get('peer_port', '').strip()
         peer_ip = request.form.get('peer_ip', '').strip()
+
+        if _is_ai_triggered(message):
+            query = _extract_ai_query(message)
+            if not query:
+                add_chat_message('system', "Archipel-AI: prompt vide. Utilise '/ask ta question'.")
+                flash_status(False, "Prompt vide pour l'assistant IA.")
+                return redirect(url_for('chat'))
+
+            context = _build_ai_context()
+            add_chat_message('ai_user', query)
+            full_prompt = (
+                "Tu es Archipel-AI, assistant du projet P2P.\n"
+                "Reponds en francais, de facon concise et actionnable.\n\n"
+                f"Contexte recent du chat ({AI_CONTEXT_SIZE} messages max):\n{context}\n\n"
+                f"Question utilisateur:\n{query}"
+            )
+            try:
+                ai_reply = ask_gemini(full_prompt)
+            except Exception as exc:
+                add_chat_message('system', f'Archipel-AI indisponible: {exc}')
+                flash_status(False, "Assistant IA indisponible (mode offline ou quota).")
+                return redirect(url_for('chat'))
+            add_chat_message('ai', ai_reply)
+            flash_status(True, 'Reponse Archipel-AI generee.')
+            return redirect(url_for('chat'))
 
         if not peer or not message:
             flash_status(False, 'Renseigne un peer ID et un message valides.')
