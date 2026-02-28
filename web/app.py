@@ -17,6 +17,7 @@ CHAT_MESSAGES: list[dict] = []
 MAX_CHAT_MESSAGES = 200
 
 CHAT_RECV_RE = re.compile(r'^\[(?:UDP-)?CHAT\]\s+recv\s+(.+?)\s+\|\s+(.+?)\s+says:\s+(.*)$')
+MANIFEST_RE = re.compile(r'^\[SEND\]\s+manifest:\s+(.+)$', re.IGNORECASE)
 
 
 def make_path(value: str) -> Path:
@@ -92,6 +93,14 @@ def ensure_node_running(port_local: int) -> bool:
     return bool(existing and existing.poll() is None)
 
 
+def extract_manifest_path(output: str) -> str | None:
+    for line in output.splitlines():
+        m = MANIFEST_RE.match(line.strip())
+        if m:
+            return m.group(1).strip()
+    return None
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -108,13 +117,46 @@ def share():
             flash_status(False, f'Le fichier {path} est introuvable.')
             return redirect(url_for('share'))
 
-        if ensure_node_running(port_local):
-            flash_status(True, f'Node deja actif sur le port {port_local}.')
+        try:
+            prep = run_command(['send', str(path)], timeout=60)
+        except subprocess.TimeoutExpired:
+            flash_status(False, 'Generation du manifeste timeout.')
             return redirect(url_for('share'))
+
+        if prep.returncode != 0:
+            lines = (prep.stderr or prep.stdout or '').strip().splitlines()
+            details = lines[-1] if lines else 'Erreur inconnue'
+            flash_status(False, f'Impossible de generer le manifeste JSON: {details}')
+            return redirect(url_for('share'))
+
+        manifest_path = extract_manifest_path((prep.stdout or '') + '\n' + (prep.stderr or ''))
+        if manifest_path and not Path(manifest_path).exists():
+            flash_status(False, f'Manifeste annonce mais introuvable: {manifest_path}')
+            return redirect(url_for('share'))
+
+        # If a node is already running on this port, restart it with the selected file.
+        existing = RUNNING_NODES.get(port_local)
+        if existing and existing.poll() is None:
+            existing.terminate()
+            try:
+                existing.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                existing.kill()
 
         proc = start_node_process(port_local, shared_file=path)
         RUNNING_NODES[port_local] = proc
-        flash_status(True, f'Node lance sur {port_local} pour partager {path.name} (pid={proc.pid}).')
+        time.sleep(0.4)
+        if proc.poll() is not None:
+            flash_status(False, f'Node non demarre sur {port_local} (port deja utilise ou erreur).')
+            return redirect(url_for('share'))
+
+        if manifest_path:
+            flash_status(
+                True,
+                f'Partage actif sur {port_local}. Manifeste JSON enregistre: {manifest_path}',
+            )
+        else:
+            flash_status(True, f'Partage actif sur {port_local}. JSON cree dans manifests/.')
         return redirect(url_for('share'))
     return render_template('share.html')
 
