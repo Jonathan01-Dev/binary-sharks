@@ -1,0 +1,14 @@
+{
+  "file_id": "fbf60f08cc6fdb961adb71c101c3a5dd5340ff37d21b21e7deb1bd0ec3eface5",
+  "filename": "requirements.txt",
+  "size": 236,
+  "chunk_size": 524288,
+  "nb_chunks": 1,
+  "chunks": [
+    {
+      "index": 0,
+      "hash": "fbf60f08cc6fdb961adb71c101c3a5dd5340ff37d21b21e7deb1bd0ec3eface5",
+      "size": 236
+    }
+  ]
+}
