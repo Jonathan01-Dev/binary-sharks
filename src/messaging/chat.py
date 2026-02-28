@@ -86,37 +86,60 @@ class ChatService:
 
     async def _exchange_keys(self, peer, my_pub_bytes: bytes) -> bytes:
         """Exchange ephemeral X25519 public keys through TCP (simplified)."""
-        reader, writer = await asyncio.open_connection(peer.ip, peer.tcp_port)
-        msg = json.dumps({'type': 'KEY_EXCHANGE', 'from': self.my_id, 'pub': my_pub_bytes.hex()}).encode()
-        writer.write(len(msg).to_bytes(4, 'big') + msg)
-        await writer.drain()
+        reader, writer, target = await self._open_peer_connection(peer.ip, peer.tcp_port)
+        try:
+            msg = json.dumps({'type': 'KEY_EXCHANGE', 'from': self.my_id, 'pub': my_pub_bytes.hex()}).encode()
+            writer.write(len(msg).to_bytes(4, 'big') + msg)
+            await writer.drain()
 
-        len_bytes = await reader.readexactly(4)
-        resp = json.loads(await reader.readexactly(int.from_bytes(len_bytes, 'big')))
-
-        writer.close()
-        await writer.wait_closed()
-        return bytes.fromhex(resp['pub'])
+            len_bytes = await asyncio.wait_for(reader.readexactly(4), timeout=8)
+            resp = json.loads(await asyncio.wait_for(reader.readexactly(int.from_bytes(len_bytes, 'big')), timeout=8))
+            if 'pub' not in resp:
+                raise RuntimeError(f'Reponse KEY_EXCHANGE invalide depuis {target[0]}:{target[1]}')
+            return bytes.fromhex(resp['pub'])
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError(f'Handshake timeout vers {target[0]}:{target[1]}') from exc
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
     async def _send_tcp(self, peer_id: str, data: bytes, peer_port: int | None = None):
         peer = self._resolve_peer(peer_id, peer_port)
         if not peer:
             raise ValueError(f'Pair hors ligne : {peer_id} (port={peer_port})')
 
-        reader, writer = await asyncio.open_connection(peer.ip, peer.tcp_port)
-        writer.write(len(data).to_bytes(4, 'big') + data)
-        await writer.drain()
-
-        ack = None
+        reader, writer, _target = await self._open_peer_connection(peer.ip, peer.tcp_port)
         try:
-            len_bytes = await asyncio.wait_for(reader.readexactly(4), timeout=5)
-            resp = json.loads(await reader.readexactly(int.from_bytes(len_bytes, 'big')))
-            ack = resp.get('status', 'UNKNOWN')
-        except Exception:
-            ack = 'NO_RESPONSE'
+            writer.write(len(data).to_bytes(4, 'big') + data)
+            await writer.drain()
 
-        writer.close()
-        await writer.wait_closed()
-        return ack
+            ack = None
+            try:
+                len_bytes = await asyncio.wait_for(reader.readexactly(4), timeout=5)
+                resp = json.loads(await asyncio.wait_for(reader.readexactly(int.from_bytes(len_bytes, 'big')), timeout=5))
+                ack = resp.get('status', 'UNKNOWN')
+            except Exception:
+                ack = 'NO_RESPONSE'
 
+            return ack
+        finally:
+            writer.close()
+            await writer.wait_closed()
 
+    async def _open_peer_connection(self, ip: str, port: int):
+        target = (ip, port)
+        try:
+            reader, writer = await asyncio.wait_for(asyncio.open_connection(ip, port), timeout=6)
+            return reader, writer, target
+        except asyncio.TimeoutError as exc:
+            raise RuntimeError(f'Connexion timeout vers {ip}:{port}') from exc
+        except OSError as exc:
+            if getattr(exc, 'winerror', None) == 121 and ip != '127.0.0.1':
+                # Windows may intermittently fail on discovered interfaces; try loopback in single-host demos.
+                reader, writer = await asyncio.wait_for(asyncio.open_connection('127.0.0.1', port), timeout=6)
+                return reader, writer, ('127.0.0.1', port)
+
+            msg = f'Connexion impossible vers {ip}:{port}'
+            if getattr(exc, 'winerror', None):
+                msg = f'{msg} (WinError {exc.winerror})'
+            raise RuntimeError(msg) from exc
