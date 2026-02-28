@@ -1,0 +1,19 @@
+﻿{% extends 'base.html' %}
+{% block content %}
+<section class="card">
+  <h2>Partager un fichier</h2>
+  <p>Indique le fichier a partager et lance le noeud sur ton port prefere.</p>
+  <form method="post">
+    <div class="form-row">
+      <label for="filepath">Chemin du fichier</label>
+      <input id="filepath" name="filepath" type="text" placeholder="demo/tmp_sprint3_test/archipel_python_guide.docx" required>
+    </div>
+    <div class="form-row">
+      <label for="port_local">Port local</label>
+      <input id="port_local" type="number" value="7902">
+    </div>
+    <button class="btn-gold" type="submit">Demarrer le noeud</button>
+  </form>
+  <div class="status">Statut: en attente</div>
+</section>
+{% endblock %}

@@ -1,0 +1,37 @@
+﻿<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Archipel Web</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <div class="page-glow"></div>
+  <header class="navbar">
+    <a class="navbar-brand" href="/">Archipel</a>
+    <nav class="navbar-nav">
+      <a class="nav-link" href="/">Accueil</a>
+      <a class="nav-link" href="/share">Partager</a>
+      <a class="nav-link" href="/download">Telecharger</a>
+      <a class="nav-link" href="/chat">Chat</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% if messages %}
+      <div class="alert-wrapper">
+        {% for category, message in messages %}
+        <div class="alert alert-{{ category }}">{{ message }}</div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    {% endwith %}
+
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer>Archipel UI - Sprint 4</footer>
+</body>
+</html>
