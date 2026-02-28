@@ -1,0 +1,14 @@
+{
+  "file_id": "3ea30dedbf61e62e0bc755901ed046cd2e86351616564955f513b12b07072448",
+  "filename": "Nouveau Document texte.txt",
+  "size": 2776,
+  "chunk_size": 524288,
+  "nb_chunks": 1,
+  "chunks": [
+    {
+      "index": 0,
+      "hash": "3ea30dedbf61e62e0bc755901ed046cd2e86351616564955f513b12b07072448",
+      "size": 2776
+    }
+  ]
+}
