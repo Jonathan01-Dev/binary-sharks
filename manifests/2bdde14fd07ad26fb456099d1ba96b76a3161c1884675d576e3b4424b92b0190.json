@@ -1,0 +1,34 @@
+{
+  "file_id": "2bdde14fd07ad26fb456099d1ba96b76a3161c1884675d576e3b4424b92b0190",
+  "filename": "sample_s3.bin",
+  "size": 2109497,
+  "chunk_size": 524288,
+  "nb_chunks": 5,
+  "chunks": [
+    {
+      "index": 0,
+      "hash": "7a98f272544b5d5acd4634ae0fd0547154ff6d70d520d969131f7f421acbf11d",
+      "size": 524288
+    },
+    {
+      "index": 1,
+      "hash": "93134b646405d1e69bd1314ba738610c27a24eba8fd71415ddc8dcf17f7fb3a5",
+      "size": 524288
+    },
+    {
+      "index": 2,
+      "hash": "e2b59f7b4c7e435e4d65b3ed2884ebd332a6c2537c8e03484c006b3551090c5b",
+      "size": 524288
+    },
+    {
+      "index": 3,
+      "hash": "80aa57e74d319ce841f35fb5282b3be8cf9eb12df488a3bf83de8ea709b17292",
+      "size": 524288
+    },
+    {
+      "index": 4,
+      "hash": "624cefcefbf941fba4a470fe919963c76db31580ab8b526c24cb7a75220a7dc0",
+      "size": 12345
+    }
+  ]
+}
