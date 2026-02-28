@@ -10,7 +10,19 @@
     </div>
     <div class="form-row">
       <label for="message">Message</label>
-      <textarea id="message" placeholder="Ton message"></textarea>
+      <textarea id="message" name="message" placeholder="Ton message" required></textarea>
+    </div>
+    <div class="form-row">
+      <label for="port_local">Port local</label>
+      <input id="port_local" name="port_local" type="number" value="7904" required>
+    </div>
+    <div class="form-row">
+      <label for="peer_port">Port du pair</label>
+      <input id="peer_port" name="peer_port" type="number" placeholder="7902">
+    </div>
+    <div class="form-row">
+      <label for="peer_ip">IP du pair (optionnel)</label>
+      <input id="peer_ip" name="peer_ip" type="text" placeholder="127.0.0.1">
     </div>
     <button class="btn-gold" type="submit">Envoyer</button>
   </form>
