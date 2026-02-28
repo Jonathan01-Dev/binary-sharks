@@ -224,7 +224,7 @@ async def cmd_msg(
         sender_id = msg.get('from')
         peer_pub_hex = msg.get('pub')
         if not sender_id or not peer_pub_hex:
-            return {'status': 'ERROR', 'reason': 'invalid key exchange payload'}
+            return {'status': 'ERROR', 'reason': 'invalid key ok exchange payload'}
 
         my_priv, my_pub = generate_x25519_keypair()
         peer_pub = nacl.public.PublicKey(bytes.fromhex(peer_pub_hex))
