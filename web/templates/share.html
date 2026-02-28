@@ -10,9 +10,16 @@
     </div>
     <div class="form-row">
       <label for="port_local">Port local</label>
-      <input id="port_local" type="number" value="7902">
+      <input id="port_local" name="port_local" type="number" value="7902" required>
     </div>
     <button class="btn-gold" type="submit">Demarrer le noeud</button>
+  </form>
+  <form method="post" action="/stop-node" class="stack-sm">
+    <div class="form-row">
+      <label for="stop_port_local">Arreter un node (port)</label>
+      <input id="stop_port_local" name="port_local" type="number" value="7902" required>
+    </div>
+    <button class="btn-gold" type="submit">Arreter le noeud</button>
   </form>
   <div class="status">Statut: en attente</div>
 </section>

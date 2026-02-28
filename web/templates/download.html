@@ -9,14 +9,14 @@
       <input id="manifest" name="manifest" type="text" placeholder="manifests/abc123.json" required>
     </div>
     <div class="form-row">
-      <label for="port_source">Port source</label>
-      <input id="port_source" type="number" value="7902">
+      <label for="port_local">Port local</label>
+      <input id="port_local" name="port_local" type="number" value="7903" required>
     </div>
     <div class="form-row">
       <label for="transport">Transport</label>
-      <select id="transport">
-        <option>tcp</option>
-        <option>udp</option>
+      <select id="transport" name="transport">
+        <option value="tcp">tcp</option>
+        <option value="udp">udp</option>
       </select>
     </div>
     <button class="btn-gold" type="submit">Telecharger</button>
