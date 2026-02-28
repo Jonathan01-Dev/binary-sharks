@@ -30,7 +30,7 @@ def flash_status(success: bool, text: str) -> None:
 
 def run_command(args: list[str], timeout: int = 120) -> subprocess.CompletedProcess:
     return subprocess.run(
-        [sys.executable, str(PROJECT_ROOT / 'main.py'), *args],
+        [sys.executable, '-u', str(PROJECT_ROOT / 'main.py'), *args],
         cwd=PROJECT_ROOT,
         capture_output=True,
         text=True,
@@ -65,6 +65,7 @@ def _node_output_reader(port: int, proc: subprocess.Popen) -> None:
 def start_node_process(port_local: int, shared_file: Path | None = None) -> subprocess.Popen:
     cmd = [
         sys.executable,
+        '-u',
         str(PROJECT_ROOT / 'main.py'),
         'start',
         '--port',
@@ -197,8 +198,14 @@ def chat():
             return redirect(url_for('chat'))
 
         if result.returncode == 0:
+            stdout = result.stdout or ''
+            delivered = 'ack=OK' in stdout
             add_chat_message('out', message, peer=peer, port=port_local)
-            flash_status(True, 'Message envoye.')
+            if delivered:
+                add_chat_message('in', f'ACK recu du pair pour: {message}', peer=peer, port=port_local)
+                flash_status(True, 'Message envoye et recu par le pair (ack=OK).')
+            else:
+                flash_status(True, 'Message envoye, sans confirmation explicite du pair.')
         else:
             lines = (result.stderr or result.stdout or '').strip().splitlines()
             details = lines[-1] if lines else 'Erreur inconnue'
