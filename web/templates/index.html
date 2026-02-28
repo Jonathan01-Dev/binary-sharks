@@ -1,11 +1,73 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block content %}
-<section class="card">
-  <h2>Interface classe</h2>
-  <p>Choisis l'ecran a tester: partage de fichier, telechargement ou chat securise.</p>
-  <div class="card-footer">
-    <span>Statut: pret</span>
-    <span>Node: inactif</span>
+<section class="card home-hero">
+  <div class="home-kicker">Projet P2P Securise</div>
+  <h1>Binary Sharks: transfert de fichiers et messagerie chiffree entre pairs</h1>
+  <p>
+    Archipel est une application peer-to-peer qui permet de partager un fichier, le telecharger via manifeste,
+    et echanger des messages avec verification d'ACK. Toute l'interface web sert de cockpit pour observer
+    les ports reseau, les nodes actifs et l'etat des operations en direct.
+  </p>
+  <div class="hero-actions">
+    <a class="btn-gold" href="/share">Demarrer un partage</a>
+    <a class="home-link" href="/terminal">Voir le terminal des ports</a>
+  </div>
+  <div class="home-metrics">
+    <div class="metric-card">
+      <span class="metric-value">4</span>
+      <span class="metric-label">modules web</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-value">TCP/UDP</span>
+      <span class="metric-label">transport supporte</span>
+    </div>
+    <div class="metric-card">
+      <span class="metric-value">JSON</span>
+      <span class="metric-label">manifeste d'echange</span>
+    </div>
+  </div>
+</section>
+
+<section class="home-grid">
+  <article class="card home-panel">
+    <h2>Ce que fait le projet</h2>
+    <ul class="home-list">
+      <li>Publication d'un fichier et generation automatique du manifeste.</li>
+      <li>Telechargement par manifeste avec choix du transport reseau.</li>
+      <li>Chat pair-a-pair avec accuse de reception (ack=OK).</li>
+      <li>Supervision en direct des ports via un terminal web dedie.</li>
+    </ul>
+  </article>
+
+  <article class="card home-panel">
+    <h2>Architecture en 3 etapes</h2>
+    <ol class="home-list ordered">
+      <li>Un node est lance sur un port local.</li>
+      <li>Le pair distant est resolu via peer id, ip et port.</li>
+      <li>Les evenements sont traces et visibles dans l'interface terminal.</li>
+    </ol>
+  </article>
+</section>
+
+<section class="card quick-links">
+  <h2>Parcours rapide</h2>
+  <div class="quick-links-row">
+    <a class="quick-link" href="/share">
+      <strong>/share</strong>
+      <span>Partager un fichier et ouvrir un node.</span>
+    </a>
+    <a class="quick-link" href="/download">
+      <strong>/download</strong>
+      <span>Recuperer un fichier depuis un manifeste JSON.</span>
+    </a>
+    <a class="quick-link" href="/chat">
+      <strong>/chat</strong>
+      <span>Envoyer des messages et verifier les ACK.</span>
+    </a>
+    <a class="quick-link" href="/terminal">
+      <strong>/terminal</strong>
+      <span>Suivre l'activite des ports en temps reel.</span>
+    </a>
   </div>
 </section>
 {% endblock %}

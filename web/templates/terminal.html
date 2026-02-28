@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+{% block content %}
+<section class="card terminal-wrap">
+  <h2>Terminal reseau</h2>
+  <p>Suivi en direct des ports, des nodes actifs et des evenements reseau.</p>
+
+  <div class="terminal-status" id="ports-status">
+    {% if ports %}
+      {% for node in ports %}
+      <span class="port-chip {{ 'port-up' if node.running else 'port-down' }}">
+        port {{ node.port }} | pid {{ node.pid }} | {{ 'UP' if node.running else 'DOWN' }}
+      </span>
+      {% endfor %}
+    {% else %}
+      <span class="port-chip port-down">Aucun node actif</span>
+    {% endif %}
+  </div>
+
+  <div id="terminal-screen" class="terminal-screen" role="log" aria-live="polite"></div>
+</section>
+
+<script>
+  (function () {
+    const screen = document.getElementById('terminal-screen');
+    const status = document.getElementById('ports-status');
+    let lastTs = 0;
+
+    function pad(n) {
+      return String(n).padStart(2, '0');
+    }
+
+    function fmtTime(ts) {
+      const d = new Date(ts);
+      return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    }
+
+    function escapeHtml(value) {
+      return value
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+        .replaceAll("'", '&#39;');
+    }
+
+    function appendEvent(evt) {
+      const line = document.createElement('div');
+      line.className = `terminal-line level-${evt.level || 'info'}`;
+      const portLabel = evt.port ? ` port=${evt.port}` : '';
+      line.innerHTML = `[${fmtTime(evt.ts)}] [${escapeHtml((evt.level || 'info').toUpperCase())}] [${escapeHtml(evt.source || 'web')}]${portLabel} ${escapeHtml(evt.message || '')}`;
+      screen.appendChild(line);
+      screen.scrollTop = screen.scrollHeight;
+    }
+
+    function renderPorts(ports) {
+      if (!Array.isArray(ports) || ports.length === 0) {
+        status.innerHTML = '<span class="port-chip port-down">Aucun node actif</span>';
+        return;
+      }
+      status.innerHTML = ports
+        .map((node) => {
+          const state = node.running ? 'UP' : 'DOWN';
+          const klass = node.running ? 'port-up' : 'port-down';
+          return `<span class="port-chip ${klass}">port ${node.port} | pid ${node.pid} | ${state}</span>`;
+        })
+        .join('');
+    }
+
+    async function poll() {
+      try {
+        const resp = await fetch(`/terminal/events?since=${lastTs}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const events = data.events || [];
+        for (const evt of events) {
+          appendEvent(evt);
+          if (evt.ts > lastTs) lastTs = evt.ts;
+        }
+        renderPorts(data.ports || []);
+      } catch (_err) {
+      }
+    }
+
+    setInterval(poll, 1200);
+    poll();
+  })();
+</script>
+{% endblock %}
