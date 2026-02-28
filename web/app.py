@@ -1,14 +1,22 @@
+import re
 import subprocess
 import sys
+import threading
+import time
 from pathlib import Path
 
-from flask import Flask, flash, redirect, render_template, request, url_for
+from flask import Flask, flash, jsonify, redirect, render_template, request, url_for
 
 app = Flask(__name__, template_folder='templates', static_folder='static')
 app.secret_key = 'archipel-web-secret'
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 RUNNING_NODES: dict[int, subprocess.Popen] = {}
+MESSAGE_LOCK = threading.Lock()
+CHAT_MESSAGES: list[dict] = []
+MAX_CHAT_MESSAGES = 200
+
+CHAT_RECV_RE = re.compile(r'^\[(?:UDP-)?CHAT\]\s+recv\s+(.+?)\s+\|\s+(.+?)\s+says:\s+(.*)$')
 
 
 def make_path(value: str) -> Path:
@@ -30,6 +38,59 @@ def run_command(args: list[str], timeout: int = 120) -> subprocess.CompletedProc
     )
 
 
+def add_chat_message(direction: str, text: str, peer: str = '', port: int | None = None) -> None:
+    item = {
+        'ts': int(time.time() * 1000),
+        'direction': direction,
+        'peer': peer,
+        'port': port,
+        'text': text,
+    }
+    with MESSAGE_LOCK:
+        CHAT_MESSAGES.append(item)
+        if len(CHAT_MESSAGES) > MAX_CHAT_MESSAGES:
+            del CHAT_MESSAGES[: len(CHAT_MESSAGES) - MAX_CHAT_MESSAGES]
+
+
+def _node_output_reader(port: int, proc: subprocess.Popen) -> None:
+    if not proc.stdout:
+        return
+    for raw_line in proc.stdout:
+        line = raw_line.strip()
+        m = CHAT_RECV_RE.match(line)
+        if m:
+            add_chat_message('in', m.group(3), peer=m.group(2), port=port)
+
+
+def start_node_process(port_local: int, shared_file: Path | None = None) -> subprocess.Popen:
+    cmd = [
+        sys.executable,
+        str(PROJECT_ROOT / 'main.py'),
+        'start',
+        '--port',
+        str(port_local),
+    ]
+    if shared_file is not None:
+        cmd.extend(['--share', str(shared_file)])
+
+    proc = subprocess.Popen(
+        cmd,
+        cwd=PROJECT_ROOT,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        bufsize=1,
+    )
+    RUNNING_NODES[port_local] = proc
+    threading.Thread(target=_node_output_reader, args=(port_local, proc), daemon=True).start()
+    return proc
+
+
+def ensure_node_running(port_local: int) -> bool:
+    existing = RUNNING_NODES.get(port_local)
+    return bool(existing and existing.poll() is None)
+
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -46,25 +107,11 @@ def share():
             flash_status(False, f'Le fichier {path} est introuvable.')
             return redirect(url_for('share'))
 
-        existing = RUNNING_NODES.get(port_local)
-        if existing and existing.poll() is None:
+        if ensure_node_running(port_local):
             flash_status(True, f'Node deja actif sur le port {port_local}.')
             return redirect(url_for('share'))
 
-        proc = subprocess.Popen(
-            [
-                sys.executable,
-                str(PROJECT_ROOT / 'main.py'),
-                'start',
-                '--port',
-                str(port_local),
-                '--share',
-                str(path),
-            ],
-            cwd=PROJECT_ROOT,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-        )
+        proc = start_node_process(port_local, shared_file=path)
         RUNNING_NODES[port_local] = proc
         flash_status(True, f'Node lance sur {port_local} pour partager {path.name} (pid={proc.pid}).')
         return redirect(url_for('share'))
@@ -133,6 +180,10 @@ def chat():
             flash_status(False, 'Renseigne un peer ID et un message valides.')
             return redirect(url_for('chat'))
 
+        if not ensure_node_running(port_local):
+            proc = start_node_process(port_local)
+            flash_status(True, f'Listener chat lance sur {port_local} (pid={proc.pid}).')
+
         cmd = ['msg', peer, message, '--port', str(port_local)]
         if peer_port:
             cmd.extend(['--peer-port', peer_port])
@@ -146,6 +197,7 @@ def chat():
             return redirect(url_for('chat'))
 
         if result.returncode == 0:
+            add_chat_message('out', message, peer=peer, port=port_local)
             flash_status(True, 'Message envoye.')
         else:
             lines = (result.stderr or result.stdout or '').strip().splitlines()
@@ -155,5 +207,13 @@ def chat():
     return render_template('chat.html')
 
 
+@app.route('/chat/messages', methods=['GET'])
+def chat_messages():
+    since = int(request.args.get('since', '0'))
+    with MESSAGE_LOCK:
+        items = [m for m in CHAT_MESSAGES if m['ts'] > since]
+    return jsonify({'messages': items})
+
+
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000, debug=True)
+    app.run(host='0.0.0.0', port=5000, debug=False)

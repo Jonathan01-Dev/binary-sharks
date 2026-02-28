@@ -1,4 +1,4 @@
-﻿{% extends 'base.html' %}
+{% extends 'base.html' %}
 {% block content %}
 <section class="card">
   <h2>Envoyer un message</h2>
@@ -26,6 +26,39 @@
     </div>
     <button class="btn-gold" type="submit">Envoyer</button>
   </form>
-  <div class="status">Dernier message: aucun</div>
+  <div class="status">Conversation live</div>
+  <div id="chat-feed" class="status" style="max-height: 260px; overflow: auto;"></div>
 </section>
+<script>
+  (function () {
+    const feed = document.getElementById('chat-feed');
+    let lastTs = 0;
+
+    function appendMessage(msg) {
+      const who = msg.direction === 'in' ? 'Recu' : 'Envoye';
+      const peer = msg.peer ? ` (${msg.peer})` : '';
+      const line = document.createElement('div');
+      line.textContent = `[${who}]${peer}: ${msg.text}`;
+      feed.appendChild(line);
+      feed.scrollTop = feed.scrollHeight;
+    }
+
+    async function poll() {
+      try {
+        const resp = await fetch(`/chat/messages?since=${lastTs}`);
+        if (!resp.ok) return;
+        const data = await resp.json();
+        const msgs = data.messages || [];
+        for (const m of msgs) {
+          appendMessage(m);
+          if (m.ts > lastTs) lastTs = m.ts;
+        }
+      } catch (_err) {
+      }
+    }
+
+    setInterval(poll, 1200);
+    poll();
+  })();
+</script>
 {% endblock %}
